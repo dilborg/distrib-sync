@@ -216,11 +216,6 @@ if (Meteor.isServer) {
       } else if (incoming_data === 'users') {
         loadUsers();
       }
-
-      res.writeHead(200, {
-        'Content-Type': 'application/json'
-      });
-      res.end(JSON.stringify({result: 'ok'}));
     }, 10000);
   });
   
@@ -248,6 +243,11 @@ if (Meteor.isServer) {
 
     console.log("CLIENT: received notice");
     incoming_data = 'queue';
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json'
+    });
+    res.end(JSON.stringify({result: 'ok'}));
   });
   
   WebApp.connectHandlers.use("/queue", function(req, res, next) {
