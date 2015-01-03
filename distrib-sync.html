@@ -3,12 +3,99 @@
 </head>
 
 <body>
-  <h1>Welcome to Meteor!</h1>
-
-  {{> hello}}
+  <div class="container">
+    <div class="page-header">
+      <h1>Distributed Sync Simulation</h1>
+    </div>
+    <div class="row">
+      <div class="col-xs-12 toolbar">
+        {{> toolbar}}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-sm-3">
+        {{> source}}
+      </div>
+      <div class="col-sm-3">
+        {{> queue}}
+      </div>
+      <div class="col-sm-3">
+        {{> channel_events}}
+      </div>
+      <div class="col-sm-3">
+        {{> dest}}
+      </div>
+    </div>
+  </div>
 </body>
+  
+<template name="toolbar">
+  <button id="add_user" class="btn btn-default">Add User</button>
+  <div class="btn-group">
+    <button id="reset_queue" class="btn btn-default">Reset Queue</button>
+    <button id="reset_events" class="btn btn-default">Reset Events</button>
+    <button id="reset_client" class="btn btn-default">Reset Client</button>
+  </div>
+</template>
 
-<template name="hello">
-  <button>Click Me</button>
-  <p>You've pressed the button {{counter}} times.</p>
+<template name="source">
+  <ul class="list-group">
+  {{#each users}}
+    <li class="list-group-item">
+      <div class="row">
+        <div class="col-xs-10">
+          {{fullname}} &lt;{{email}}&gt;<br/>
+          ({{_id}})
+        </div>
+        <div class="col-xs-1">
+          <a href="#" class="text-danger delete"><i class="glyphicon glyphicon-remove-circle"></i></a>
+        </div>
+      </div>
+    </li>
+  {{/each}}
+  </ul>
+</template>
+  
+<template name="queue">
+  <ul class="list-group">
+  {{#each queue}}
+    <li class="list-group-item">
+      <h4 class="list-group-item-heading">{{type}} <small>{{timestamp}}</small></h4>
+      <p class="list-group-item-text">{{> queue_item}}</p>
+    </li>
+  {{/each}}
+  </ul>
+</template>
+
+<template name="queue_item">
+  {{> Template.dynamic template=queueItemTemplate}}
+</template>
+
+<template name="queue_add_user">
+  + {{user.fullname}} &lt;{{user.email}}&gt;
+</template>
+
+<template name="queue_remove_user">
+  + {{user_id}}
+</template>
+
+<template name="queue_unknown">
+  + {{user.fullname}} &lt;{{user.email}}&gt;
+</template>
+
+<template name="channel_events">
+  {{#each events}}
+    {{timestamp}} ({{name}})<br/>
+  {{/each}}
+</template>
+
+<template name="dest">
+  <ul class="list-group">
+  {{#each users}}
+    <li class="list-group-item">
+      {{fullname}} &lt;{{email}}&gt;<br/>
+      ({{id}})
+    </li>
+  {{/each}}
+  </ul>
 </template>
