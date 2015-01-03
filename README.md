@@ -11,7 +11,6 @@ Server
 * Change is captured in a queue
 * Client is notified of change
 * On request of the queue or users, queue data is cleared (read once)
-*
 
 Client
 ------
