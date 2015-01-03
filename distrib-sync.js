@@ -93,7 +93,57 @@ if (Meteor.isClient) {
 }
 
 if (Meteor.isServer) {
-  var incoming_data = false;
+  var incoming_data = null;
+  
+  var loadUsers = function() {
+    var ext_user;
+        
+    incoming_data = null;
+
+    //merge user list
+    HTTP.get(Meteor.absoluteUrl() + '/users', function (error, result) {
+      var data = result.data;
+
+      console.log("CLIENT: merging users");
+      console.log(data);
+
+      var users_by_id = {};
+      data.users.forEach(function (user) {
+        users_by_id[user._id] = user;
+      });
+
+      ClientUsers.find({}).forEach(function (user) {
+        ext_user = users_by_id[user.id];
+
+        if (ext_user) {
+          console.log("CLIENT: updating user");
+          console.log(user);
+          console.log(ext_user);
+
+          ClientUsers.update(user._id, {$set: { fullname: ext_user.fullname, email: ext_user.email }});
+
+          delete users_by_id[user.id]
+        } else {
+          console.log("CLIENT: removing user");
+          console.log(user);
+
+          ClientUsers.remove(user._id);
+        }
+      });
+
+      //all remaining are new
+      for (var id in users_by_id) {
+        if (users_by_id.hasOwnProperty(id)) {
+          ext_user = users_by_id[id];
+
+          console.log("CLIENT: adding user");
+          console.log(ext_user);
+
+          ClientUsers.insert({id: id, fullname: ext_user.fullname, email: ext_user.email});
+        }
+      }
+    });
+  };
   
   Meteor.startup(function () {
     ChannelEvents.find({}).observeChanges({
@@ -114,90 +164,58 @@ if (Meteor.isServer) {
     });
 
     Meteor.setInterval(function () {
-      if (!incoming_data) {
+      if (incoming_data === null) {
         return;
       }
       
-      incoming_data = false;
+      var data_error = false, i, item;
       
-      HTTP.get(Meteor.absoluteUrl() + '/queue', function (error, result) {
-        var data = result.data;
-        console.log(data);
+      if (incoming_data === 'queue') {
+        incoming_data = null;
 
-        data.queue_items.forEach(function(item) {
-          var error = false;
+        HTTP.get(Meteor.absoluteUrl() + '/queue', function (error, result) {
+          if (error) {
+            data_error = true;
+          } else {
+            var data = result.data;
+            console.log(data);
 
-          if (item.type) {
-            if (item.type === 'add_user') {
-              console.log("CLIENT: adding user");
-              console.log(item.user);
+            for (i=0; i < data.queue_items.length; i++) {
+              var item = data.queue_items[i];
 
-              ClientUsers.insert(item.user);
-            } else if (item.type === 'remove_user') {
-              var client_user = ClientUsers.findOne({id: item.user_id});
+              if (item.type) {
+                if (item.type === 'add_user') {
+                  console.log("CLIENT: adding user");
+                  console.log(item.user);
 
-              if (client_user) {
-                console.log("CLIENT: removing user");
-                console.log(client_user);
+                  ClientUsers.insert(item.user);
+                } else if (item.type === 'remove_user') {
+                  var client_user = ClientUsers.findOne({id: item.user_id});
 
-                ClientUsers.remove(client_user._id);
+                  if (client_user) {
+                    console.log("CLIENT: removing user");
+                    console.log(client_user);
+
+                    ClientUsers.remove(client_user._id);
+                  } else {
+                    data_error = true;
+                    break;
+                  }
+                }
               } else {
-                error = true;
+                data_error = true;
+                break;
               }
             }
-          } else {
-            error = true;
           }
-
-          if (error) {
-            var ext_user;
-
-            //reset user list
-            HTTP.get(Meteor.absoluteUrl() + '/users', function (error, result) {
-              var data = result.data;
-
-              console.log("CLIENT: merging users");
-              console.log(data);
-
-              var users_by_id = {};
-              data.users.forEach(function (user) {
-                users_by_id[user._id] = user;
-              });
-
-              ClientUsers.find({}).forEach(function (user) {
-                ext_user = users_by_id[user.id];
-
-                if (ext_user) {
-                  console.log("CLIENT: updating user");
-                  console.log(user);
-                  console.log(ext_user);
-
-                  ClientUsers.update(user._id, {$set: { fullname: ext_user.fullname, email: ext_user.email }});
-
-                  delete users_by_id[user.id]
-                } else {
-                  console.log("CLIENT: removing user");
-                  console.log(user);
-
-                  ClientUsers.remove(user._id);
-                }
-              });
-
-              //all remaining are new
-              for (var id in users_by_id) {
-                if (users_by_id.hasOwnProperty(id)) {
-                  ext_user = users_by_id[id];
-
-                  console.log("CLIENT: adding user");
-                  console.log(ext_user);
-
-                  ClientUsers.insert({id: id, fullname: ext_user.fullname, email: ext_user.email});
-                }
-              }
-            });
+          
+          if (data_error) {
+            loadUsers();
           }
-        })
-      });
+        });
+      } else if (incoming_data === 'users') {
+        loadUsers();
+      }
 
       res.writeHead(200, {
         'Content-Type': 'application/json'
@@ -221,7 +239,7 @@ if (Meteor.isServer) {
       ChannelEvents.remove({});
     },
     resetClient: function() {
-      ClientUsers.remove({});
+      incoming_data = 'users';
     }
   });
   
@@ -229,7 +247,7 @@ if (Meteor.isServer) {
     ChannelEvents.insert({name: 'change.queue', timestamp: Date.now()});
 
     console.log("CLIENT: received notice");
-    incoming_data = true;
+    incoming_data = 'queue';
   });
   
   WebApp.connectHandlers.use("/queue", function(req, res, next) {
